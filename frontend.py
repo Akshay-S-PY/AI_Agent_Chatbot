@@ -1,14 +1,19 @@
-# frontend.py — one-app Streamlit demo (no FastAPI)
+
+# Includes:
+# 1) Groq as default provider
+# 2) History trimming (last N turns)
+# 3) Retries + fallback from OpenAI -> Groq on errors (e.g., rate limit)
+
 import os
-import requests  # not used, but handy if you later call an API
 import streamlit as st
 
 # Lang* imports
 from langgraph.prebuilt import create_react_agent
-from langchain_groq import ChatGroq
-from langchain_openai import ChatOpenAI
 from langchain_tavily import TavilySearch
 from langchain_core.messages import AIMessage, BaseMessage
+
+# --- Read provider SDKs inside the builder to keep imports light ---
+# (Still safe to import at top; this just reduces startup noise on Cloud.)
 
 # ---------- Secrets / env ----------
 # Streamlit Cloud: st.secrets; local: .env (optional)
@@ -16,14 +21,17 @@ for k in ("OPENAI_API_KEY", "GROQ_API_KEY", "TAVILY_API_KEY"):
     if k in st.secrets:
         os.environ[k] = st.secrets[k]
 
+# ---------- App config ----------
 st.set_page_config(page_title="LangGraph Agent UI", layout="centered")
 st.title("🤖 AI Chatbot Agents")
 st.caption("Create and interact with your LangGraph + LangChain agent")
 
 # ---------- Sidebar (models) ----------
 st.sidebar.header("Model Settings")
+
+# (1) Make Groq the default provider
 PROVIDERS = ["Groq", "OpenAI"]
-provider = st.sidebar.radio("Provider", PROVIDERS, index=0)
+provider = st.sidebar.radio("Provider", PROVIDERS, index=0)  # Groq default
 
 MODEL_GROQ = ["llama-3.1-8b-instant", "llama-3.1-70b-versatile", "mixtral-8x7b-32768"]
 MODEL_OPENAI = ["gpt-4o-mini"]
@@ -44,7 +52,7 @@ if "system_prompt" not in st.session_state:
 if "clear_next" not in st.session_state:
     st.session_state.clear_next = False
 
-# ---------- System prompt with button ----------
+# ---------- System prompt with button (no Ctrl+Enter) ----------
 with st.form("sys_form", clear_on_submit=False):
     sys_val = st.text_area(
         "System prompt (defines your agent’s behavior)",
@@ -59,7 +67,7 @@ if apply_sys:
 
 st.markdown("### Chat")
 
-# ---------- Chat form ----------
+# ---------- Chat form (Send button, compact spacing) ----------
 default_msg = "" if st.session_state.clear_next else ""
 with st.form("chat_form", clear_on_submit=False):
     user_msg = st.text_area("Your message", value=default_msg, height=120, placeholder="Ask anything…")
@@ -67,26 +75,48 @@ with st.form("chat_form", clear_on_submit=False):
     send = c1.form_submit_button("Send 🚀")
     clear = c2.form_submit_button("Clear chat 🧹")
 
-# ---------- Build agent on demand ----------
-def build_agent():
-    if provider == "Groq":
-        llm = ChatGroq(model=model_name)
+# ---------- Agent builder ----------
+def build_agent(selected_provider: str, selected_model: str):
+    # Import the chosen LLM here (keeps top-level imports minimal)
+    if selected_provider == "Groq":
+        from langchain_groq import ChatGroq
+        llm = ChatGroq(model=selected_model, max_retries=2, timeout=60)
     else:
-        llm = ChatOpenAI(model=model_name)
+        from langchain_openai import ChatOpenAI
+        llm = ChatOpenAI(model=selected_model, max_retries=2, timeout=60)
 
     tools = [TavilySearch(max_results=3)] if allow_web_search else []
     return create_react_agent(model=llm, tools=tools)
 
+# ---------- Single turn with history trimming + fallback ----------
 def run_turn(user_input: str) -> str:
-    agent = build_agent()
-    # Convert our UI history into LangGraph messages (tuples)
-    messages = [("system", st.session_state.system_prompt)] + [
-        (m["role"], m["content"]) for m in st.session_state.history
-    ] + [("user", user_input)]
+    # (2) Trim history: keep only last N turns to control tokens
+    MAX_TURNS = 6
+    recent = st.session_state.history[-MAX_TURNS:]
 
-    result = agent.invoke({"messages": messages})
+    messages = [("system", st.session_state.system_prompt)]
+    messages += [(m["role"], m["content"]) for m in recent]
+    messages += [("user", user_input)]
+
+    # Try chosen provider first
+    try:
+        agent = build_agent(provider, model_name)
+        result = agent.invoke({"messages": messages})
+    except Exception as e:
+        # (3) Fallback if the chosen provider is OpenAI (common rate limits)
+        if provider == "OpenAI":
+            try:
+                st.info("OpenAI error / rate limit — switching to Groq fallback.")
+                fallback_provider = "Groq"
+                fallback_model = "llama-3.1-8b-instant"
+                agent = build_agent(fallback_provider, fallback_model)
+                result = agent.invoke({"messages": messages})
+            except Exception as e2:
+                return f"⚠️ Both providers failed: {e2}"
+        else:
+            return f"⚠️ Request failed: {e}"
+
     msgs: list[BaseMessage] = result.get("messages", [])
-    # return last AI message content
     for m in reversed(msgs):
         if isinstance(m, AIMessage):
             return m.content
