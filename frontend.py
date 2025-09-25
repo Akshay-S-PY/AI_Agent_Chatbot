@@ -85,8 +85,10 @@ def build_agent(selected_provider: str, selected_model: str):
         from langchain_openai import ChatOpenAI
         llm = ChatOpenAI(model=selected_model, max_retries=2, timeout=60)
 
-    tools = [TavilySearch(max_results=3)] if allow_web_search else []
-    return create_react_agent(model=llm, tools=tools)
+    tools = []
+    if allow_web_search:
+        tools.append(TavilySearch(max_results=3, include_images=False))
+        return create_react_agent(model=llm, tools=tools)
 
 # ---------- Single turn with history trimming + fallback ----------
 def run_turn(user_input: str) -> str:
@@ -143,3 +145,4 @@ else:
 for m in st.session_state.history:
     with st.chat_message("user" if m["role"] == "user" else "assistant"):
         st.markdown(m["content"])
+
