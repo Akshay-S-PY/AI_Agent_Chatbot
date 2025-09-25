@@ -1,28 +1,41 @@
-# 🤖 LangGraph AI Agent Chatbot
+# 🤖 AI Agent Chatbot (LangGraph + Groq + OpenAI + Tavily)
 
-An AI chatbot powered by **LangGraph** + **LangChain** with support for:
-- **Groq** models (`llama-3.1-8b-instant`, `llama-3.1-70b-versatile`, `mixtral-8x7b-32768`)
-- **OpenAI** models (`gpt-4o-mini`)
-- **Tavily** web search integration
+An **AI-powered chatbot** built with **LangGraph** and **LangChain**, deployed on **Streamlit Cloud**.  
+It supports multiple LLM providers (**Groq, OpenAI**) and integrates **Tavily API** for real-time web search.  
+The chatbot is live and functional — try it out directly from your browser!
 
-The project includes:
-- **FastAPI backend** (`backend.py`) to handle requests and run the agent
-- **LangGraph agent builder** (`ai_agent.py`)
-- **Streamlit frontend** (`frontend.py`) for a simple chat UI
-- `.env.example` to manage API keys
+👉 [**Live Demo on Streamlit**](https://agentbyakshay.streamlit.app)
 
 ---
 
 ## 🚀 Features
-- Multi-turn chat with memory (conversation history kept on frontend)
-- Configurable **system prompt** to define agent behavior
-- Optional **web search** via Tavily
-- Easily switch between Groq and OpenAI models
-- Clean FastAPI + Swagger docs for testing API directly
+- **Dynamic AI Agents**: Built with LangGraph ReAct architecture for reasoning + tool use.
+- **Multi-Model Support**:  
+  - Groq → `llama-3.1-8b-instant`, `llama-3.1-70b-versatile`, `mixtral-8x7b-32768`  
+  - OpenAI → `gpt-4o-mini`
+- **Real-Time Web Search**: Tavily API integration for live, up-to-date results.
+- **Customizable System Prompt**: Define the agent’s role (e.g., “Act as a dietician”, “Act as an AI consultant”).
+- **Chat UI**: Built with Streamlit — supports multi-turn history, clear chat, and web search toggle.
+- **Error Handling**: Automatic **OpenAI → Groq fallback** on rate-limit or quota errors.
+- **Deployed**: Streamlit Cloud (public URL, no local setup required to try).
 
 ---
 
-## 📦 Installation
+## 🛠 Tech Stack
+- **LangGraph** (ReAct agent orchestration)
+- **LangChain** (LLM integrations)
+- **Groq API** (Llama 3 + Mixtral models, ultra-fast inference)
+- **OpenAI GPT-4o-mini**
+- **Tavily API** (web search tool)
+- **Streamlit** (frontend + deployment)
+- **Python 3.12**
+- **dotenv / Streamlit Secrets** (for key management)
+
+---
+
+## 📦 Local Installation (optional)
+
+You can also run this locally if you want to develop or extend it.
 
 ### 1. Clone the repo
 bash
@@ -46,56 +59,45 @@ source .venv/bin/activate
 pip install -U pip
 pip install -r requirements.txt
 
-4. Configure environment variables
+4. Setup environment variables
 
-Copy .env.example → .env and fill in your real API keys:
+Create a .env file (local only, don’t commit it) or use Streamlit secrets when deploying:
 
 OPENAI_API_KEY=sk-yourkey
 GROQ_API_KEY=gsk-yourkey
 TAVILY_API_KEY=tvly-yourkey
 
-▶️ Usage
-Run the backend (FastAPI)
-uvicorn backend:app --reload --host 127.0.0.1 --port 9999
-
-
-API docs available at: http://127.0.0.1:9999/docs
-
-Example request body for /chat:
-
-{
-  "model_name": "llama-3.1-8b-instant",
-  "model_provider": "Groq",
-  "system_prompt": "Act as a smart, friendly AI chatbot.",
-  "messages": [
-    { "role": "user", "content": "What is FastAPI?" }
-  ],
-  "allow_search": false
-}
-
-Run the frontend (Streamlit)
-
-In a new terminal (same environment):
-
+5. Run Streamlit app
 streamlit run frontend.py
 
+🌍 Deployment (Streamlit Cloud)
 
-Open: http://localhost:8501
+Push repo to GitHub.
+
+Go to Streamlit Cloud
+ → New app.
+
+Select your repo → frontend.py.
+
+In Settings → Secrets, paste keys in TOML format:
+
+OPENAI_API_KEY = "sk-yourkey"
+GROQ_API_KEY = "gsk-yourkey"
+TAVILY_API_KEY = "tvly-yourkey"
+
+
+Deploy 🚀 Your app gets a public URL like:
+https://your-app.streamlit.app
 
 🗂 Project Structure
 AI_Agent_Chatbot/
-│── ai_agent.py      # Helper to build and run LangGraph agent
-│── backend.py       # FastAPI backend with /chat endpoint
-│── frontend.py      # Streamlit UI
-│── requirements.txt # Dependencies
-│── .env.example     # Example env variables
-│── README.md        # Project docs
+│── frontend.py       # Streamlit app
+│── requirements.txt  # Dependencies
+│── .env.example      # Example env vars (local dev)
+│── README.md         # Project docs
 
 🔒 Security
 
-Never commit .env (already ignored in .gitignore).
+API keys are never hardcoded; they are loaded via .env (local) or st.secrets (Streamlit Cloud).
 
-Only share .env.example with placeholders.
-
-Store real keys locally or in GitHub Secrets for CI/CD.
-
+.env is in .gitignore to prevent accidental leaks.
